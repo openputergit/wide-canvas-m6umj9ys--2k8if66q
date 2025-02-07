@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Educational Quiz Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="max-w-md mx-auto min-h-screen bg-white">
+        <!-- Header -->
+        <header class="p-4 border-b flex items-center">
+            <button onclick="goBack()" class="mr-2"><i class="bi bi-arrow-left text-xl"></i></button>
+            <h1 class="text-xl font-semibold flex-1">Choose Your Class</h1>
+            <button onclick="toggleSearch()"><i class="bi bi-search text-xl"></i></button>
+        </header>
+
+        <!-- Search Bar (Hidden by default) -->
+        <div id="searchBar" class="hidden p-4 bg-gray-50">
+            <input type="text" placeholder="Search class or stream..." class="w-full p-2 border rounded-lg">
+        </div>
+
+        <!-- Class Selection -->
+        <div id="classSelection" class="p-4 grid grid-cols-2 gap-4">
+            <!-- Classes will be dynamically populated -->
+        </div>
+
+        <!-- Subject Selection (Initially Hidden) -->
+        <div id="subjectSelection" class="hidden p-4">
+            <h2 class="text-xl font-semibold mb-4">Choose Subject</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Subjects will be dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Level Selection (Initially Hidden) -->
+        <div id="levelSelection" class="hidden p-4">
+            <h2 class="text-xl font-semibold mb-4">Choose Difficulty</h2>
+            <div class="grid grid-cols-1 gap-4">
+                <button onclick="startQuiz('easy')" class="p-4 bg-green-100 rounded-lg text-left">Easy</button>
+                <button onclick="startQuiz('medium')" class="p-4 bg-yellow-100 rounded-lg text-left">Medium</button>
+                <button onclick="startQuiz('hard')" class="p-4 bg-red-100 rounded-lg text-left">Hard</button>
+            </div>
+        </div>
+
+        <!-- Quiz Section (Initially Hidden) -->
+        <div id="quizSection" class="hidden p-4">
+            <div id="quizHeader" class="mb-4">
+                <div class="flex justify-between items-center">
+                    <span id="questionCounter" class="text-lg font-semibold">Question 1/10</span>
+                    <span id="timer" class="text-lg font-semibold">Time: 00:00</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                    <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+            <div id="questionContainer" class="mb-4">
+                <p id="questionText" class="text-lg font-medium mb-4"></p>
+                <div id="optionsContainer" class="space-y-3">
+                    <!-- Options will be dynamically populated -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Section (Initially Hidden) -->
+        <div id="resultSection" class="hidden p-4">
+            <h2 class="text-xl font-semibold mb-4">Quiz Results</h2>
+            <div id="resultDetails" class="space-y-4">
+                <!-- Results will be dynamically populated -->
+            </div>
+            <button onclick="restartQuiz()" class="w-full mt-4 bg-blue-500 text-white p-3 rounded-lg">Try Again</button>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loader" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div class="loader"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentClass = '';
+        let currentSubject = '';
+        let currentLevel = '';
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let timer;
+        let seconds = 0;
+        const userId = localStorage.getItem('quizUserId') || 'user_' + Math.random().toString(36).substr(2, 9);
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('quizUserId')) {
+                localStorage.setItem('quizUserId', userId);
+            }
+            populateClasses();
+        });
+
+        function populateClasses() {
+            const classes = [
+                { name: 'LKG', icon: '🧸' },
+                { name: 'UKG', icon: '📏' },
+                { name: 'Class 1', icon: '📚' },
+                { name: 'Class 2', icon: '📖' },
+                { name: 'Class 3', icon: '📝' },
+                { name: 'Class 4', icon: '✏️' },
+                { name: 'Class 5', icon: '📐' },
+                { name: 'Class 6', icon: '📓' },
+                { name: 'Class 7', icon: '📘' },
+                { name: 'Class 8', icon: '📗' },
+                { name: 'Class 9', icon: '🔬' },
+                { name: 'Class 10', icon: '🔭' },
+                { name: 'Medical', icon: '⚕️' },
+                { name: 'Non-Medical', icon: '📊' },
+                { name: 'Commerce', icon: '💹' },
+                { name: 'Humanities/Arts', icon: '🎨' }
+            ];
+
+            const container = document.getElementById('classSelection');
+            container.innerHTML = classes.map(cls => `
+                <button onclick="selectClass('${cls.name}')" 
+                        class="p-4 bg-white rounded-lg shadow-sm border hover:border-blue-500 transition-all
+                        flex items-center space-x-2">
+                    <span class="text-2xl">${cls.icon}</span>
+                    <span class="font-medium">${cls.name}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectClass(className) {
+            currentClass = className;
+            document.getElementById('classSelection').classList.add('hidden');
+            document.getElementById('subjectSelection').classList.remove('hidden');
+            
+            const subjects = ['Mathematics', 'Science', 'English', 'Social Studies', 'General Knowledge'];
+            const subjectContainer = document.querySelector('#subjectSelection div');
+            subjectContainer.innerHTML = subjects.map(subject => `
+                <button onclick="selectSubject('${subject}')" 
+                        class="p-4 bg-white rounded-lg shadow-sm border hover:border-blue-500 transition-all">
+                    ${subject}
+                </button>
+            `).join('');
+        }
+
+        function selectSubject(subject) {
+            currentSubject = subject;
+            document.getElementById('subjectSelection').classList.add('hidden');
+            document.getElementById('levelSelection').classList.remove('hidden');
+        }
+
+        async function startQuiz(level) {
+            currentLevel = level;
+            document.getElementById('levelSelection').classList.add('hidden');
+            document.getElementById('quizSection').classList.remove('hidden');
+            
+            // Show loader
+            document.getElementById('loader').classList.remove('hidden');
+            
+            // Generate questions based on class, subject and level
+            questions = generateQuestions(currentClass, currentSubject, currentLevel);
+            
+            // Hide loader
+            document.getElementById('loader').classList.add('hidden');
+            
+            // Start timer
+            startTimer();
+            
+            // Show first question
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const question = questions[currentQuestionIndex];
+            document.getElementById('questionCounter').textContent = `Question ${currentQuestionIndex + 1}/${questions.length}`;
+            document.getElementById('questionText').textContent = question.question;
+            
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = question.options.map((option, index) => `
+                <button onclick="submitAnswer('${option}')" 
+                        class="w-full p-3 text-left rounded-lg border hover:bg-blue-50 transition-all">
+                    ${option}
+                </button>
+            `).join('');
+            
+            // Update progress bar
+            const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+        }
+
+        function submitAnswer(answer) {
+            const question = questions[currentQuestionIndex];
+            if (answer === question.correctAnswer) {
+                score++;
+            }
+
+            currentQuestionIndex++;
+            if (currentQuestionIndex < questions.length) {
+                showQuestion();
+            } else {
+                endQuiz();
+            }
+        }
+
+        async function endQuiz() {
+            clearInterval(timer);
+            document.getElementById('quizSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+
+            const percentage = (score / questions.length) * 100;
+            const resultDetails = document.getElementById('resultDetails');
+            resultDetails.innerHTML = `
+                <p class="text-lg">Score: ${score}/${questions.length}</p>
+                <p class="text-lg">Percentage: ${percentage}%</p>
+                <p class="text-lg">Time Taken: ${formatTime(seconds)}</p>
+            `;
+
+            // Save result to database
+            try {
+                const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/db', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer SmUTcU0LmjTj1pgAg66JKbTb7xa2',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: userId,
+                        appSlug: 'educational-quiz',
+                        action: 'create',
+                        table: 'quiz_results',
+                        data: {
+                            class: currentClass,
+                            subject: currentSubject,
+                            level: currentLevel,
+                            score: score,
+                            totalQuestions: questions.length,
+                            percentage: percentage,
+                            timeTaken: seconds
+                        }
+                    })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    console.error('Error saving results:', data.error);
+                }
+            } catch (error) {
+                console.error('Error saving results:', error);
+            }
+        }
+
+        function generateQuestions(className, subject, level) {
+            // This is a simplified version. In a real app, you'd fetch questions from a backend
+            const questionBank = [
+                {
+                    question: "What is 2 + 2?",
+                    options: ["3", "4", "5", "6"],
+                    correctAnswer: "4"
+                },
+                {
+                    question: "Which planet is known as the Red Planet?",
+                    options: ["Mars", "Venus", "Jupiter", "Saturn"],
+                    correctAnswer: "Mars"
+                },
+                // Add more questions as needed
+            ];
+            return questionBank;
+        }
+
+        function startTimer() {
+            seconds = 0;
+            timer = setInterval(() => {
+                seconds++;
+                document.getElementById('timer').textContent = `Time: ${formatTime(seconds)}`;
+            }, 1000);
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${padZero(minutes)}:${padZero(remainingSeconds)}`;
+        }
+
+        function padZero(number) {
+            return number.toString().padStart(2, '0');
+        }
+
+        function restartQuiz() {
+            currentQuestionIndex = 0;
+            score = 0;
+            document.getElementById('resultSection').classList.add('hidden');
+            document.getElementById('classSelection').classList.remove('hidden');
+        }
+
+        function goBack() {
+            if (!document.getElementById('classSelection').classList.contains('hidden')) {
+                // At root level, do nothing or implement as needed
+                return;
+            }
+            if (!document.getElementById('subjectSelection').classList.contains('hidden')) {
+                document.getElementById('subjectSelection').classList.add('hidden');
+                document.getElementById('classSelection').classList.remove('hidden');
+            }
+            if (!document.getElementById('levelSelection').classList.contains('hidden')) {
+                document.getElementById('levelSelection').classList.add('hidden');
+                document.getElementById('subjectSelection').classList.remove('hidden');
+            }
+        }
+
+        function toggleSearch() {
+            const searchBar = document.getElementById('searchBar');
+            searchBar.classList.toggle('hidden');
+        }
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
